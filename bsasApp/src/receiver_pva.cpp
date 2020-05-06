@@ -175,6 +175,8 @@ PVAReceiver::PVAReceiver(Collector& collector)
 {
     REFTRACE_INCREMENT(num_instances);
     collector.add_receiver(this); // calls our names()
+    // populate initial type
+    slices(slices_t());
 }
 
 PVAReceiver::~PVAReceiver()
