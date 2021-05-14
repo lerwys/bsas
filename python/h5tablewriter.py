@@ -13,6 +13,13 @@ import select
 import logging
 import threading
 
+if sys.version_info < (3,):
+    def b(x):
+        return x
+else:
+    def b(x):
+        return x.encode('utf-8')
+
 try:
     from ConfigParser import SafeConfigParser as _ConfigParser, NoOptionError
     class ConfigParser(_ConfigParser):
@@ -387,7 +394,7 @@ def set_proc_name(newname):
     from ctypes import cdll, byref, create_string_buffer
     libc = cdll.LoadLibrary(None)
     buff = create_string_buffer(len(newname)+1)
-    buff.value = newname
+    buff.value = b(newname)
     libc.prctl(15, byref(buff), 0, 0, 0) # PR_SET_NAME=15 on Linux
 
 def main(conf):
