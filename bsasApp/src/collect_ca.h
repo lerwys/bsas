@@ -11,6 +11,8 @@
 #include <pv/noDefaultMethods.h>
 #include <pv/sharedVector.h>
 
+#include "collectible.h"
+
 typedef epicsGuard<epicsMutex> Guard;
 typedef epicsGuardRelease<epicsMutex> UnGuard;
 
@@ -22,7 +24,8 @@ struct connection_handler_args;
 
 struct Collector;
 
-struct DBRValue {
+struct DBRValue : public RValue {
+public:
     struct Holder {
         static size_t num_instances;
 
@@ -41,15 +44,49 @@ public:
     DBRValue() {}
     DBRValue(Holder *H) :held(H) {}
 
-    bool valid() const { return !!held; }
-    Holder* operator->() {return held.get();}
-    const Holder* operator->() const {return held.get();}
-
-    void swap(DBRValue& o) {
-        held.swap(o.held);
+    virtual epicsTimeStamp get_ts() OVERRIDE FINAL {
+        return held->ts;
     }
-    void reset() {
+    virtual void set_ts(epicsTimeStamp ts) OVERRIDE FINAL {
+        held->ts = ts;
+    }
+    virtual epicsUInt16 get_sevr() OVERRIDE FINAL {
+        return held->sevr;
+    }
+    virtual void set_sevr(epicsUInt16 sevr) OVERRIDE FINAL {
+        held->sevr = sevr;
+    }
+    virtual epicsUInt16 get_stat() OVERRIDE FINAL {
+        return held->stat;
+    }
+    virtual void set_stat(epicsUInt16 stat) OVERRIDE FINAL {
+        held->stat = stat;
+    }
+    virtual epicsUInt32 get_count() OVERRIDE FINAL {
+        return held->count;
+    }
+    virtual void set_count(epicsUInt32 count) OVERRIDE FINAL {
+        held->count = count;
+    }
+    virtual const epics::pvData::shared_vector<const void>& get_buffer() OVERRIDE FINAL {
+        return held->buffer;
+    }
+    virtual void set_buffer(const epics::pvData::shared_vector<const void>& buffer) OVERRIDE FINAL {
+        held->buffer = buffer;
+    }
+    virtual bool valid() const OVERRIDE FINAL {
+        return !!held;
+    }
+    virtual void swap(RValue& o) OVERRIDE FINAL {
+        _swap(dynamic_cast<DBRValue &>(o));
+    }
+    virtual void reset() OVERRIDE FINAL {
         held.reset();
+    }
+
+private:
+    void _swap(DBRValue& o) {
+        held.swap(o.held);
     }
 };
 
@@ -71,8 +108,30 @@ struct CAContext {
     EPICS_NOT_COPYABLE(CAContext)
 };
 
-struct Subscription {
+struct Subscription : public Subscribable {
     static size_t num_instances;
+
+    Subscription(const CAContext& context,
+                 size_t column,
+                 const std::string& pvname,
+                 Collector& collector);
+    ~Subscription();
+
+    virtual const size_t get_column() OVERRIDE FINAL;
+    virtual const std::string get_pvname() OVERRIDE FINAL;
+    virtual void close() OVERRIDE FINAL;
+    virtual std::tr1::shared_ptr<RValue> pop() OVERRIDE FINAL;
+    virtual void clear(size_t remain) OVERRIDE FINAL;
+    virtual const std::deque<std::tr1::shared_ptr<RValue>>& get_values() OVERRIDE FINAL;
+
+    // for test code only
+    void push(const DBRValue& v);
+
+private:
+    void _push(DBRValue& v);
+
+    static void onConnect (struct connection_handler_args args);
+    static void onEvent (struct event_handler_args args);
 
     const std::string pvname;
     const CAContext& context;
@@ -84,41 +143,18 @@ struct Subscription {
     // effectively a local of a CA worker, set and cleared from onConnect()
     struct oldSubscription *evid;
 
-    mutable epicsMutex mutex;
-
-    bool connected;
-    // stats counters
-    size_t nDisconnects, nErrors, nUpdates, nUpdateBytes, nOverflows;
-    // previous values of counters for delta
-    size_t lDisconnects, lErrors, lUpdates, lUpdateBytes, lOverflows;
-    // current buffer limit
-    size_t limit;
-
     epicsTimeStamp last_event;
 
-    std::deque<DBRValue> values;
+    std::deque<std::tr1::shared_ptr<RValue>> values;
 
-    Subscription(const CAContext& context,
-                 size_t column,
-                 const std::string& pvname,
-                 Collector& collector);
-    ~Subscription();
-
-    void close();
-
-    void clear(size_t remain);
-
-    // dequeue one update
-    DBRValue pop();
-
-    // for test code only
-    void push(const DBRValue& v);
-
-private:
-    void _push(DBRValue& v);
-
-    static void onConnect (struct connection_handler_args args);
-    static void onEvent (struct event_handler_args args);
+    // properties
+    DEFINE_IMPL_PROP_METHODS(connected, size_t)
+    DEFINE_IMPL_PROP_METHODS2(Disconnects, size_t, n, l)
+    DEFINE_IMPL_PROP_METHODS2(Errors, size_t, n, l)
+    DEFINE_IMPL_PROP_METHODS2(Updates, size_t, n, l)
+    DEFINE_IMPL_PROP_METHODS2(UpdateBytes, size_t, n, l)
+    DEFINE_IMPL_PROP_METHODS2(Overflows, size_t, n, l)
+    DEFINE_IMPL_PROP_METHODS(limit, size_t)
 
     EPICS_NOT_COPYABLE(Subscription)
 };

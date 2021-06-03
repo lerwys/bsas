@@ -156,14 +156,14 @@ Subscription::Subscription(const CAContext &context,
     ,evid(0)
     ,connected(false)
     ,nDisconnects(0u)
-    ,nErrors(0u)
-    ,nUpdates(0u)
-    ,nUpdateBytes(0u)
-    ,nOverflows(0u)
     ,lDisconnects(0u)
+    ,nErrors(0u)
     ,lErrors(0u)
+    ,nUpdates(0u)
     ,lUpdates(0u)
+    ,nUpdateBytes(0u)
     ,lUpdateBytes(0u)
+    ,nOverflows(0u)
     ,lOverflows(0u)
     ,limit(16u) // arbitrary, will be overwritten during first data update
 {
@@ -187,6 +187,16 @@ Subscription::~Subscription()
 {
     close();
     REFTRACE_DECREMENT(num_instances);
+}
+
+const size_t Subscription::get_column()
+{
+    return column;
+}
+
+const std::string Subscription::get_pvname()
+{
+    return pvname;
 }
 
 void Subscription::close()
@@ -223,9 +233,15 @@ void Subscription::clear(size_t remain)
 
 }
 
-DBRValue Subscription::pop()
+const std::deque<std::tr1::shared_ptr<RValue>>& Subscription::get_values()
 {
-    DBRValue ret;
+    return values;
+}
+
+std::tr1::shared_ptr<RValue> Subscription::pop()
+{
+    std::tr1::shared_ptr<RValue> ret =
+        std::tr1::shared_ptr<DBRValue>(new DBRValue());
     {
         Guard G(mutex);
         if(!values.empty()) {
@@ -255,8 +271,8 @@ void Subscription::_push(DBRValue& v)
         nOverflows++;
     }
 
-    values.push_back(DBRValue());
-    values.back().swap(v);
+    values.push_back(std::tr1::shared_ptr<DBRValue>(new DBRValue()));
+    values.back()->swap(v);
 }
 
 void Subscription::onConnect (struct connection_handler_args args)
@@ -297,7 +313,9 @@ void Subscription::onConnect (struct connection_handler_args args)
             self->evid = 0;
 
             DBRValue val(new DBRValue::Holder);
-            epicsTimeGetCurrent(&val->ts);
+            epicsTimeStamp ts;
+            epicsTimeGetCurrent(&ts);
+            val.set_ts(ts);
 
             bool notify;
             {
@@ -390,11 +408,11 @@ void Subscription::onEvent (struct event_handler_args args)
         }
 
         DBRValue val(new DBRValue::Holder);
-        val->sevr = meta.severity;
-        val->stat = meta.status;
-        val->ts = meta.stamp;
-        val->count = count;
-        val->buffer = pvd::freeze(buf);
+        val.set_sevr(meta.severity);
+        val.set_stat(meta.status);
+        val.set_ts(meta.stamp);
+        val.set_count(count);
+        val.set_buffer(pvd::freeze(buf));
 
         bool notify;
         {

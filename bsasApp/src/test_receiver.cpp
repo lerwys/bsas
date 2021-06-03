@@ -39,15 +39,16 @@ struct TestPVA {
         slice.second.resize(2);
 
         DBRValue V(new DBRValue::Holder);
-        V->sevr = V->stat = 0;
-        V->ts = ts;
-        V->count = 1;
+        V.set_sevr(0);
+        V.set_stat(0);
+        V.set_ts(ts);
+        V.set_count(1);
 
         pvd::shared_vector<double> temp(1);
         temp[0] = v;
-        V->buffer = pvd::static_shared_vector_cast<const void>(pvd::freeze(temp));
+        V.set_buffer(pvd::static_shared_vector_cast<const void>(pvd::freeze(temp)));
 
-        slice.second.at(c) = V;
+        slice.second.at(c) = std::tr1::shared_ptr<DBRValue>(new DBRValue(std::move(V)));
     }
 
     void test_simple()

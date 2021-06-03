@@ -141,28 +141,28 @@ void Coordinator::handle()
                 assert(pvnames.size()==collector->pvs.size());
 
                 for(size_t i=0, N=collector->pvs.size(); i<N; i++) {
-                    const Collector::PV& pv = collector->pvs[i];
+                    const Collector::pv_type_t& pv = collector->pvs[i];
                     if(!pv.sub) {
                         conn[i] = 0;
 
                     } else {
-                        Subscription& sub = *pv.sub;
+                        std::tr1::shared_ptr<Subscribable> sub = pv.sub;
 
-                        Guard G2(sub.mutex);
+                        Guard G2(sub->mutex);
 
-                        conn[i] = sub.connected;
+                        conn[i] = sub->get_connected();
 
-                        events[i] = sub.nUpdates - sub.lUpdates;
-                        bytes[i] = sub.nUpdateBytes - sub.lUpdateBytes;
-                        discons[i] = sub.nDisconnects - sub.lDisconnects;
-                        errors[i] = sub.nErrors - sub.lErrors;
-                        oflows[i] = sub.nOverflows - sub.lOverflows;
+                        events[i] = sub->get_nUpdates() - sub->get_lUpdates();
+                        bytes[i] = sub->get_nUpdateBytes() - sub->get_lUpdateBytes();
+                        discons[i] = sub->get_nDisconnects() - sub->get_lDisconnects();
+                        errors[i] = sub->get_nErrors() - sub->get_lErrors();
+                        oflows[i] = sub->get_nOverflows() - sub->get_lOverflows();
 
-                        sub.lUpdates = sub.nUpdates;
-                        sub.lUpdateBytes = sub.nUpdateBytes;
-                        sub.lDisconnects = sub.nDisconnects;
-                        sub.lErrors = sub.nErrors;
-                        sub.lOverflows = sub.nOverflows;
+                        sub->set_lUpdates(sub->get_nUpdates());
+                        sub->set_lUpdateBytes(sub->get_nUpdateBytes());
+                        sub->set_lDisconnects(sub->get_nDisconnects());
+                        sub->set_lErrors(sub->get_nErrors());
+                        sub->set_lOverflows(sub->get_nOverflows());
                     }
                 }
 

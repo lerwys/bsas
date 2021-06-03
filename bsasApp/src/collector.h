@@ -13,7 +13,7 @@
 #include "collect_ca.h"
 
 struct Receiver {
-    typedef std::vector<std::pair<epicsUInt64, std::vector<DBRValue> > > slices_t;
+    typedef std::vector<std::pair<epicsUInt64, std::vector<std::tr1::shared_ptr<RValue>> > > slices_t;
     virtual ~Receiver() {}
     virtual void names(const std::vector<std::string>& n) =0;
     virtual void slices(const slices_t& s) =0;
@@ -35,12 +35,13 @@ struct Collector
     epicsMutex mutex;
 
     struct PV {
-        std::tr1::shared_ptr<Subscription> sub;
+        std::tr1::shared_ptr<Subscribable> sub;
         bool ready;
         bool connected;
         PV() :ready(false), connected(false) {}
     };
     typedef std::vector<PV> pvs_t;
+    typedef pvs_t::value_type pv_type_t;
     pvs_t pvs;
 
     typedef std::set<Receiver*> receivers_t;
@@ -64,7 +65,9 @@ struct Collector
     void remove_receiver(Receiver*);
 
     // only for unittest code
-    inline Subscription* subscription(size_t column) { return pvs[column].sub.get(); }
+    inline Subscription* subscription(size_t column) {
+        return dynamic_cast<Subscription*>(pvs[column].sub.get());
+    }
 
 private:
     // locals for processor thread

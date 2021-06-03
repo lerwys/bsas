@@ -42,7 +42,7 @@ struct PVAReceiver : public Receiver
         epics::pvData::ScalarType ftype;
 
         // last populated value, used to backfill
-        DBRValue last;
+        std::tr1::shared_ptr<RValue> last;
 
         Column() :isarray(false), ftype(epics::pvData::pvDouble) {}
     };

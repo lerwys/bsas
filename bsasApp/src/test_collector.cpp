@@ -39,8 +39,9 @@ struct TestReceiver : public Receiver
         {
             Guard G(mutex);
             myslices.reserve(myslices.size()+s.size());
-            for(size_t i=0, N=s.size(); i<N; i++)
+            for(size_t i=0, N=s.size(); i<N; i++) {
                 myslices.push_back(s[i]);
+            }
         }
         wakeup.signal();
     }
@@ -60,16 +61,17 @@ struct TestReceiver : public Receiver
         pvd::shared_vector<double> V;
         V.push_back(val);
         DBRValue value(new DBRValue::Holder);
-        value->ts = now;
-        value->sevr = value->stat = 0; // NO_ALARM
-        value->buffer = pvd::static_shared_vector_cast<const void>(pvd::freeze(V));
+        value.set_ts(now);
+        value.set_sevr(0);
+        value.set_stat(0); // NO_ALARM
+        value.set_buffer(pvd::static_shared_vector_cast<const void>(pvd::freeze(V)));
         collector.subscription(column)->push(value);
     }
 
     void push_disconn(size_t column) {
         testDiag("column %zu push disconnect @%x%x", column, now.secPastEpoch, now.nsec);
         DBRValue value(new DBRValue::Holder);
-        value->ts = now;
+        value.set_ts(now);
         collector.subscription(column)->push(value);
     }
 
@@ -109,23 +111,23 @@ struct TestFooBar {
         }
     }
 
-    void testValue(const DBRValue& value, const epicsTimeStamp& ts, double val, const char *label)
+    void testValue(const std::tr1::shared_ptr<RValue> value, const epicsTimeStamp& ts, double val, const char *label)
     {
         if(isnan(val)) {
             // expect disconnected
-            if(!value.valid() || value->sevr>3) {
+            if(!value || !value->valid() || value->get_sevr()>3) {
                 testPass("Expect %s disconnected.", label );
             } else {
-                double actual = pvd::shared_vector_convert<const double>(value->buffer)[0]; // assumes size()>=1
+                double actual = pvd::shared_vector_convert<const double>(value->get_buffer())[0]; // assumes size()>=1
                 testFail("Unexpected %s value %f", label, actual);
             }
-        } else if(!value.valid()) {
+        } else if(!value || !value->valid()) {
             testFail("%s not valid", label);
         } else {
-            double actual = pvd::shared_vector_convert<const double>(value->buffer)[0]; // assumes size()>=1
-            bool test = value->ts.secPastEpoch==ts.secPastEpoch && value->ts.nsec==ts.nsec && val==actual;
+            double actual = pvd::shared_vector_convert<const double>(value->get_buffer())[0]; // assumes size()>=1
+            bool test = value->get_ts().secPastEpoch==ts.secPastEpoch && value->get_ts().nsec==ts.nsec && val==actual;
             testTrue(test)
-                    <<" ts "<<std::hex<<ts.secPastEpoch<<std::hex<<ts.nsec<<"=="<<std::hex<<value->ts.secPastEpoch<<std::hex<<value->ts.nsec
+                    <<" ts "<<std::hex<<ts.secPastEpoch<<std::hex<<ts.nsec<<"=="<<std::hex<<value->get_ts().secPastEpoch<<std::hex<<value->get_ts().nsec
                     <<" "<<val<<"=="<<actual;
         }
     }

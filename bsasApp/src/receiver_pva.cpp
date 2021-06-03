@@ -61,34 +61,35 @@ struct NumericScalarCopier : public PVAReceiver::ColCopy
         PVAReceiver::Column& column = receiver.columns.at(coln);
 
         for(size_t r=0, R=s.size(); r<R; r++) {
-            DBRValue cell(s[r].second.at(coln));
+            std::tr1::shared_ptr<RValue> cell = s[r].second.at(coln);
 
-            if(bsasBackFill && !cell.valid() && column.last.valid()) {
+            if(bsasBackFill && (!cell || !cell->valid()) &&
+                    (column.last && column.last->valid())) {
                 // back fill from previous
                 cell = column.last;
             }
 
-            if(!cell.valid() || cell->sevr > 3) {
+            if((!cell || !cell->valid()) || cell->get_sevr() > 3) {
                 // disconnected
                 column.last.swap(cell);
                 continue;
 
-            } else if(cell->count!=1 || cell->buffer.original_type()!=column.ftype) {
-                column.ftype = cell->buffer.original_type();
-                column.isarray = cell->count!=1;
+            } else if(cell->get_count()!=1 || cell->get_buffer().original_type()!=column.ftype) {
+                column.ftype = cell->get_buffer().original_type();
+                column.isarray = cell->get_count()!=1;
                 receiver.state = PVAReceiver::NeedRetype;
                 column.last.reset();
                 if(receiverPVADebug>1) {
                     errlogPrintf("%s triggers type change from scalar %d to %s %d\n",
                                  column.fname.c_str(), column.ftype,
-                                 cell->count==1?"scalar":"array", cell->buffer.original_type());
+                                 cell->get_count()==1?"scalar":"array", cell->get_buffer().original_type());
                 }
                 return;
             }
             assert(column.ftype==(pvd::ScalarType)pvd::ScalarTypeID<value_type>::value);
 
-            // could just alias cell->buffer.data()
-            const pvd::shared_vector<const value_type>& elem(pvd::static_shared_vector_cast<const value_type>(cell->buffer));
+            // could just alias cell->get_buffer().data()
+            const pvd::shared_vector<const value_type>& elem(pvd::static_shared_vector_cast<const value_type>(cell->get_buffer()));
             assert(elem.size()==1);
 
             scratch[r] = elem[0];
@@ -128,19 +129,20 @@ struct NumericArrayCopier : public PVAReceiver::ColCopy
         pvd::PVDataCreatePtr create(pvd::getPVDataCreate());
 
         for(size_t r=0, R=s.size(); r<R; r++) {
-            DBRValue cell(s[r].second.at(coln));
+            std::tr1::shared_ptr<RValue> cell = s[r].second.at(coln);
 
-            if(bsasBackFill && !cell.valid() && column.last.valid()) {
+            if(bsasBackFill && (!cell || !cell->valid()) &&
+                    (column.last && column.last->valid())) {
                 // back fill from previous
                 cell = column.last;
             }
 
-            if(!cell.valid() || cell->sevr > 3) {
+            if(!cell || !cell->valid() || cell->get_sevr() > 3) {
                 // disconnected
                 column.last.swap(cell);
                 continue;
 
-            } else if(cell->buffer.original_type()!=column.ftype) {
+            } else if(cell->get_buffer().original_type()!=column.ftype) {
                 column.ftype = arrtype->getElementType();
                 // always an array.  never switches (back) to scalar
                 receiver.state = PVAReceiver::NeedRetype;
@@ -148,13 +150,13 @@ struct NumericArrayCopier : public PVAReceiver::ColCopy
                 if(receiverPVADebug>1) {
                     errlogPrintf("%s triggers type change from array %d to array %d\n",
                                  column.fname.c_str(), column.ftype,
-                                 cell->buffer.original_type());
+                                 cell->get_buffer().original_type());
                 }
                 return;
             }
 
             pvd::PVScalarArrayPtr arr(create->createPVScalarArray(arrtype));
-            arr->putFrom(cell->buffer);
+            arr->putFrom(cell->get_buffer());
 
             pvd::PVUnionPtr U(create->createPVUnion(utype));
             U->set(0, arr);

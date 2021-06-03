@@ -72,11 +72,11 @@ void Collector::notEmpty(Subscription *sub)
     bool wakeme;
     {
         Guard G(mutex);
-        pvs[sub->column].ready = true;
+        pvs[sub->get_column()].ready = true;
         wakeme = waiting;
     }
     if(collectorDebug>2)
-        errlogPrintf("## %s notEmpty %s\n", sub->pvname.c_str(), wakeme?" wakeup":"");
+        errlogPrintf("## %s notEmpty %s\n", sub->get_pvname().c_str(), wakeme?" wakeup":"");
     if(wakeme)
         wakeup.signal();
 }
@@ -92,7 +92,7 @@ void Collector::add_receiver(Receiver* recv)
 
         names.reserve(pvs.size());
         for(size_t i=0, N=pvs.size(); i<N; i++) {
-            names.push_back(pvs[i].sub->pvname);
+            names.push_back(pvs[i].sub->get_pvname());
         }
     }
     recv->names(names);
@@ -164,12 +164,12 @@ void Collector::process_dequeue()
         nothing = true;
 
         for(size_t i=0, N=pvs.size(); i<N; i++) {
-            PV& pv = pvs[i];
+            pv_type_t& pv = pvs[i];
 
             if((i!=0 && !pv.ready) || !pv.sub) continue;
 
-            DBRValue val(pv.sub->pop());
-            if(!val.valid()) {
+            std::tr1::shared_ptr<RValue> val = pv.sub->pop();
+            if(!val || !val->valid()) {
                 pv.ready = false;
                 continue;
             }
@@ -177,14 +177,14 @@ void Collector::process_dequeue()
 
             nothing = false; // we will do something
 
-            epicsUInt64 key = val->ts.secPastEpoch;
+            epicsUInt64 key = val->get_ts().secPastEpoch;
             key <<= 32;
-            key |= val->ts.nsec;
+            key |= val->get_ts().nsec;
 
-            pv.connected = val->sevr<=3;
+            pv.connected = val->get_sevr()<=3;
 
             if(collectorDebug>3) {
-                errlogPrintf("## %s event:%llx sevr %u\n", pv.sub->pvname.c_str(), key, val->sevr);
+                errlogPrintf("## %s event:%llx sevr %u\n", pv.sub->get_pvname().c_str(), key, val->get_sevr());
             }
 
             if(!pv.connected || key > oldest_key) {
@@ -195,9 +195,9 @@ void Collector::process_dequeue()
                 events_t::mapped_type& slice = events[key]; // implicitly allocs new slice
                 slice.resize(pvs.size());
 
-                if(slice[i].valid()) {
+                if(slice[i] && slice[i]->valid()) {
                     if(collectorDebug>=0) {
-                        errlogPrintf("%s : ignore duplicate key %llx\n", pvs[i].sub->pvname.c_str(), key);
+                        errlogPrintf("%s : ignore duplicate key %llx\n", pvs[i].sub->get_pvname().c_str(), key);
                     }
 
                 } else {
@@ -207,7 +207,7 @@ void Collector::process_dequeue()
             } else if(pv.connected) {
                 // disconnect event
             } else if(collectorDebug>0) {
-                errlogPrintf("## %s ignore leftovers of %llx\n", pvs[i].sub->pvname.c_str(), key);
+                errlogPrintf("## %s ignore leftovers of %llx\n", pvs[i].sub->get_pvname().c_str(), key);
             }
         }
     }
@@ -221,7 +221,7 @@ void Collector::process_dequeue()
         // only carry over 4 events per PV
 
         for(size_t i=0, N=pvs.size(); i<N; i++) {
-            PV& pv = pvs[i];
+            pv_type_t& pv = pvs[i];
             if(pv.sub) {
                 pv.sub->clear(4);
             }
@@ -263,13 +263,13 @@ void Collector::process_test()
             // test if all data available or disconnected
             bool complete = true;
             for(size_t i=0, N=pvs.size(); complete && i<N; i++) {
-                complete = !pvs[i].connected || slice[i].valid();
+                complete = !pvs[i].connected || (slice[i] && slice[i]->valid());
 
                 if(!complete && collectorDebug > (e<=4 && events.size()>4 ? 4 : 1)) {
                     errlogPrintf("## test slice %llx found incomplete %s %sconn %svalid\n",
-                                 it->first, pvs[i].sub->pvname.c_str(),
+                                 it->first, pvs[i].sub->get_pvname().c_str(),
                                  !pvs[i].connected?"dis":"",
-                                 slice[i].valid()?"":"in");
+                                 (slice[i] && slice[i]->valid())?"":"in");
                 }
             }
 

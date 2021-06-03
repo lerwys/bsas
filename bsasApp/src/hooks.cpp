@@ -90,23 +90,23 @@ void bsas_report(int lvl)
             for(size_t i=0, N=coord->collector->pvs.size(); i<N; i++) {
                 if(!coord->collector->pvs[i].sub) continue;
 
-                const Subscription* sub = coord->collector->pvs[i].sub.get();
+                const std::tr1::shared_ptr<Subscribable> sub = coord->collector->pvs[i].sub;
 
                 Guard G2(sub->mutex); // mutex order: Coordinator::mutex -> Subscription::mutex
 
-                if(lvl<2 && sub->nOverflows==0) continue;
-                if(lvl<3 && !sub->connected) continue;
+                if(lvl<2 && sub->get_nOverflows()==0) continue;
+                if(lvl<3 && !sub->get_connected()) continue;
 
                 epicsStdoutPrintf("  %s\t %zu/%zu conn=%c #dis=%zu #err=%zu #up=%zu #MB=%.1f #oflow=%zu\n",
-                                  sub->pvname.c_str(),
-                                  sub->values.size(),
-                                  sub->limit,
-                                  sub->connected?'Y':'_',
-                                  sub->nDisconnects,
-                                  sub->nErrors,
-                                  sub->nUpdates,
-                                  sub->nUpdateBytes/1048576.0,
-                                  sub->nOverflows);
+                                  sub->get_pvname().c_str(),
+                                  sub->get_values().size(),
+                                  sub->get_limit(),
+                                  sub->get_connected()?'Y':'_',
+                                  sub->get_nDisconnects(),
+                                  sub->get_nErrors(),
+                                  sub->get_nUpdates(),
+                                  sub->get_nUpdateBytes()/1048576.0,
+                                  sub->get_nOverflows());
             }
         }
 
@@ -166,15 +166,20 @@ void bsasStatReset(const char *name)
             for(size_t i=0, N=coord->collector->pvs.size(); i<N; i++) {
                 if(!coord->collector->pvs[i].sub) continue;
 
-                Subscription* sub = coord->collector->pvs[i].sub.get();
+                std::tr1::shared_ptr<Subscribable> sub = coord->collector->pvs[i].sub;
 
                 Guard G2(sub->mutex); // establishes mutex order Coordinator::mutex -> Subscription::mutex
 
-                sub->nDisconnects = sub->lDisconnects = 0u;
-                sub->nErrors = sub->lErrors = 0u;
-                sub->nUpdates = sub->lUpdates = 0u;
-                sub->nUpdateBytes = sub->lUpdateBytes = 0u;
-                sub->nOverflows = sub->lOverflows = 0u;
+                sub->set_nDisconnects(0u);
+                sub->set_lDisconnects(0u);
+                sub->set_nErrors(0u);
+                sub->set_lErrors(0u);
+                sub->set_nUpdates(0u);
+                sub->set_lUpdates(0u);
+                sub->set_nUpdateBytes(0u);
+                sub->set_lUpdateBytes(0u);
+                sub->set_nOverflows(0u);
+                sub->set_lOverflows(0u);
             }
         }
 
