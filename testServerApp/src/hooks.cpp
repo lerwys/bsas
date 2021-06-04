@@ -24,6 +24,8 @@ pvd::shared_vector<std::string> pv_names;
 pvas::StaticProvider::shared_pointer provider;
 // use to prohibit adding new PVs after iocInit()
 bool locked;
+// update period to PVATestServer argument
+double update_period = 1.0;
 
 void testServerExit(void *)
 {
@@ -46,11 +48,13 @@ void testServerHook(initHookState state)
     epicsAtExit(testServerExit, 0);
 
     // create PVs
-    pv_server.reset(new PVATestServer(*provider, pvd::freeze(pv_names)));
+    pv_server.reset(new PVATestServer(*provider, pvd::freeze(pv_names),
+                update_period));
 }
 
 } // namespace
 
+/* testServerPVScalarAdd */
 extern "C"
 void testServerPVScalarAdd(const char *name)
 {
@@ -61,7 +65,6 @@ void testServerPVScalarAdd(const char *name)
     }
 }
 
-/* testServerPVScalarAdd */
 static const iocshArg testServerPVScalarAddArg0 = {
     "name",
     iocshArgString
@@ -79,6 +82,36 @@ static void testServerPVScalarAddCallFunc(const iocshArgBuf *args)
     testServerPVScalarAdd(args[0].sval);
 }
 
+/* testServerPVUpdatePeriod */
+extern "C"
+void testServerPVUpdatePeriod(double period)
+{
+    update_period = period;
+    // if server already initialized we need to
+    // call set_update_period(), otherwise it will
+    // be constructed with this value
+    if(pv_server) {
+        pv_server->set_update_period(update_period);
+    }
+}
+
+static const iocshArg testServerPVUpdatePeriodArg0 = {
+    "period",
+    iocshArgDouble
+};
+static const iocshArg * const testServerPVUpdatePeriodArgs[] = {
+    &testServerPVUpdatePeriodArg0
+};
+static const iocshFuncDef testServerPVUpdatePeriodFuncDef = {
+    "testServerPVUpdatePeriod",
+    1,
+    testServerPVUpdatePeriodArgs
+};
+static void testServerPVUpdatePeriodCallFunc(const iocshArgBuf *args)
+{
+    testServerPVUpdatePeriod(args[0].dval);
+}
+
 static void testServerRegistrar()
 {
     // create empty provider before the PVA server is started
@@ -88,6 +121,8 @@ static void testServerRegistrar()
 
     // register PV add
     iocshRegister(&testServerPVScalarAddFuncDef, testServerPVScalarAddCallFunc);
+    // register PV update period
+    iocshRegister(&testServerPVUpdatePeriodFuncDef, testServerPVUpdatePeriodCallFunc);
     // initial setup
     initHookRegister(&testServerHook);
 }

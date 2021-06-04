@@ -13,4 +13,7 @@ testServerPVScalarAdd("TEST:PV2")
 testServerPVScalarAdd("TEST:PV3")
 testServerPVScalarAdd("TEST:PV4")
 
+# Set server PV update rate
+testServerPVUpdatePeriod(1.0)
+
 iocInit()
