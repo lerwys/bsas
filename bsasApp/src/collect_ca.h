@@ -125,10 +125,10 @@ struct Subscription : public Subscribable {
     virtual const std::deque<std::tr1::shared_ptr<RValue>>& get_values() OVERRIDE FINAL;
 
     // for test code only
-    void push(const DBRValue& v);
+    virtual void push(const RValue& v) OVERRIDE FINAL;
 
 private:
-    void _push(DBRValue& v);
+    void _push(RValue& v);
 
     static void onConnect (struct connection_handler_args args);
     static void onEvent (struct event_handler_args args);

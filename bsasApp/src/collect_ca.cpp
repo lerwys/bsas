@@ -252,18 +252,18 @@ std::tr1::shared_ptr<RValue> Subscription::pop()
     return ret;
 }
 
-void Subscription::push(const DBRValue &v)
+void Subscription::push(const RValue &v)
 {
     assert(!context.context); // only call in unittest code
     {
         Guard G(mutex);
-        DBRValue temp(v);
+        DBRValue temp(dynamic_cast<const DBRValue&>(v));
         _push(temp);
     }
 }
 
 // assume locked
-void Subscription::_push(DBRValue& v)
+void Subscription::_push(RValue& v)
 {
     while(values.size() > limit) {
         // we drop newest element to maximize chance of overlapping with lower rate PVs

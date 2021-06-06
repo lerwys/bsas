@@ -60,6 +60,8 @@ struct Subscribable {
     virtual void close() = 0;
     // dequeue one update
     virtual std::tr1::shared_ptr<RValue> pop() = 0;
+    // queue one update. ONLY FOR TESTS
+    virtual void push(const RValue& v) = 0;
     // flush values
     virtual void clear(size_t remain) = 0;
     // get values

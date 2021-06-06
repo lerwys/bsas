@@ -67,7 +67,7 @@ void Collector::close()
     processor.exitWait();
 }
 
-void Collector::notEmpty(Subscription *sub)
+void Collector::notEmpty(Subscribable *sub)
 {
     bool wakeme;
     {

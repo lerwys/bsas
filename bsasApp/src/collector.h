@@ -59,14 +59,14 @@ struct Collector
 
     void close();
 
-    void notEmpty(Subscription* sub);
+    void notEmpty(Subscribable* sub);
 
     void add_receiver(Receiver*);
     void remove_receiver(Receiver*);
 
     // only for unittest code
-    inline Subscription* subscription(size_t column) {
-        return dynamic_cast<Subscription*>(pvs[column].sub.get());
+    inline Subscribable* subscription(size_t column) {
+        return pvs[column].sub.get();
     }
 
 private:
