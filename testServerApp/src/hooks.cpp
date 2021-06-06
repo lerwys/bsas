@@ -114,6 +114,9 @@ static void testServerPVUpdatePeriodCallFunc(const iocshArgBuf *args)
 
 static void testServerRegistrar()
 {
+    //refcounters to help detecing slow ref./resources leaks
+    epics::registerRefCounter("PVATestServer", &PVATestServer::num_instances);
+
     // create empty provider before the PVA server is started
     provider.reset(new pvas::StaticProvider("testServer"));
     // register pre-created server provider

@@ -10,6 +10,7 @@
 
 #include <pv/thread.h>
 #include <pv/pvAccess.h>
+#include <pv/reftrack.h>
 #include <pva/server.h>
 #include <pva/sharedstate.h>
 
@@ -29,6 +30,9 @@ public:
 
     void set_update_period(double period);
     double get_update_period();
+
+    // for reftrack
+    static size_t num_instances;
 
 private:
     pvas::StaticProvider& provider;

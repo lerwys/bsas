@@ -21,6 +21,8 @@ pvd::StructureConstPtr pv_type_scalar(
 
 } // namespace
 
+size_t PVATestServer::num_instances;
+
 PVATestServer::PVATestServer(pvas::StaticProvider& provider,
         pvd::shared_vector<const std::string> const& pv_names,
         double update_period)
@@ -32,6 +34,8 @@ PVATestServer::PVATestServer(pvas::StaticProvider& provider,
              << "PVATestServer")
     , running(true)
 {
+    REFTRACE_INCREMENT(num_instances);
+
     for(pv_names_t::iterator it = pv_names.begin(); it != pv_names.end(); ++it) {
         pvs.push_back(std::make_pair(*it, pvas::SharedPV::buildReadOnly()));
     }
@@ -49,6 +53,7 @@ PVATestServer::PVATestServer(pvas::StaticProvider& provider,
 
 PVATestServer::~PVATestServer()
 {
+    REFTRACE_DECREMENT(num_instances);
     // end thread graciously
     {
         Guard G(mutex);
