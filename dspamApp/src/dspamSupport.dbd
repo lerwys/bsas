@@ -1,3 +1,5 @@
 registrar(dspamReg)
 device(ao, INST_IO, devSpamControlPeriod, "Spam Control Period")
 device(ai, INST_IO, devSpamCounter, "Spam Counter")
+
+device(columnarin, INST_IO, devSpamCOLICounter, "Spam COLI Counter")

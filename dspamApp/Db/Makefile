@@ -5,8 +5,10 @@ include $(TOP)/configure/CONFIG
 
 DB += dspamController.db
 DB += dspamCounter.db
+DB += dspamCounterTable.db
 
 DB += dspamCounter100.db
+DB += dspamCounterTable100.db
 
 include $(TOP)/configure/RULES
 #----------------------------------------
