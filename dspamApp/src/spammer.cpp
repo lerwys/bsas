@@ -34,12 +34,18 @@
 
 #include <aoRecord.h>
 #include <aiRecord.h>
+#include <columnarinRecord.h>
 
 #include "iocshelper.h"
 
 #include <epicsExport.h>
 
 namespace {
+
+namespace pvd = epics::pvData;
+
+// arbitrary number of columns for columnarinRecord devsup
+static const size_t MAX_COLS = 16;
 
 typedef epicsGuard<epicsMutex> Guard;
 typedef epicsGuardRelease<epicsMutex> UnGuard;
@@ -90,6 +96,23 @@ struct spam_message {
 };
 static_assert(sizeof(spam_message)==4*3, "No padding");
 
+struct Counter {
+    std::string col;
+    pvd::shared_vector<const pvd::uint32> counter;
+};
+
+struct Receiver;
+
+struct CounterTable {
+    // columns counter/stamp
+    std::vector<Counter> counters;
+    pvd::shared_vector<const pvd::uint32> sec, ns;
+
+    Receiver* receiver;
+
+    CounterTable(Receiver* receiver) : receiver(receiver) {};
+};
+
 struct Receiver : public epicsThreadRunable {
     static std::map<std::string, std::unique_ptr<Receiver> > receivers;
 
@@ -105,6 +128,8 @@ struct Receiver : public epicsThreadRunable {
     bool running;
 
     bool valid;
+
+    // last counter/stamp
     epicsUInt32 counter;
     epicsTimeStamp stamp;
 
@@ -118,6 +143,10 @@ struct Receiver : public epicsThreadRunable {
     static long init_record(dbCommon *prec);
     static long get_io_intr_info(int detach, struct dbCommon *prec, IOSCANPVT* pscan);
     static long read_counter(aiRecord *prec);
+
+    static long init_record_coli(dbCommon *prec);
+    static long get_io_intr_info_tbl(int detach, struct dbCommon *prec, IOSCANPVT* pscan);
+    static long read_counter_tbl(columnarinRecord* prec);
 };
 std::map<std::string, std::unique_ptr<Receiver> > Receiver::receivers;
 
@@ -257,6 +286,99 @@ long Receiver::read_counter(aiRecord *prec)
         prec->val = self->counter;
         prec->time = self->stamp;
         if(!self->valid)
+            (void)recGblSetSevr(prec, COMM_ALARM, INVALID_ALARM);
+
+        return 2; // disable convert
+    } CATCH()
+    return S_dev_noDeviceFound;
+}
+
+long Receiver::init_record_coli(dbCommon *prec)
+{
+    try {
+        DBLINK* dlink = dbGetDevLink(prec);
+        assert(dlink->type==INST_IO);
+
+        auto it = receivers.find(dlink->value.instio.string);
+        if(it==receivers.end())
+            throw std::runtime_error("No such Controller");
+
+        std::unique_ptr<CounterTable> priv(new CounterTable(it->second.get()));
+
+        multiArray::add_column(prec, "secondsPastEpoch", "sec", pvd::pvUInt);
+        multiArray::add_column(prec, "nanoseconds", "ns", pvd::pvUInt);
+
+        for (size_t i = 0; i < MAX_COLS; ++i) {
+            Counter temp;
+            temp.col = std::string("count") + std::to_string((int)i);
+            multiArray::add_column(prec, temp.col.c_str(), temp.col.c_str(), pvd::pvUInt);
+            priv->counters.push_back(temp);
+        }
+
+        // if all goes well, get away with unique_ptr
+        prec->dpvt = (void*)priv.release();
+
+    CATCH()
+    return 0;
+}
+
+long Receiver::get_io_intr_info_tbl(int detach, struct dbCommon *prec, IOSCANPVT* pscan)
+{
+    TRY(CounterTable) {
+        *pscan = self->receiver->scan;
+        return 0;
+    }CATCH()
+    return S_dev_noDeviceFound;
+}
+
+long Receiver::read_counter_tbl(columnarinRecord* prec)
+{
+    const size_t limit = 1000;
+    TRY(CounterTable) {
+        pvd::shared_vector<pvd::uint32> sec, ns;
+
+        sec.reserve(1+self->sec.size());
+        ns.reserve(1+self->ns.size());
+
+        // add actual stamp
+        sec.push_back(self->receiver->stamp.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH);
+        ns.push_back(self->receiver->stamp.nsec);
+
+        // push older other stamps back to vector
+        for(size_t i = 0; i < self->sec.size() && i < limit; i++) {
+            sec.push_back(self->sec[i]);
+        }
+        for(size_t i = 0; i < self->ns.size() && i < limit; i++) {
+            ns.push_back(self->ns[i]);
+        }
+
+        self->sec = pvd::freeze(sec);
+        self->ns = pvd::freeze(ns);
+
+        // update all counters vectors
+        for(std::vector<Counter>::iterator it = self->counters.begin(), end = self->counters.end(); it != end; ++it) {
+            Counter& count = *it;
+
+            pvd::shared_vector<pvd::uint32> temp;
+            temp.reserve(1+count.counter.size());
+            temp.push_back(self->receiver->counter);
+
+            for(size_t i = 0; i < count.counter.size() && i < limit; i++) {
+                temp.push_back(count.counter[i]);
+            }
+
+            count.counter = pvd::freeze(temp);
+
+            multiArray::set_column(prec, count.col.c_str(),
+                    pvd::static_shared_vector_cast<const void>(count.counter));
+        }
+
+        multiArray::set_column(prec, "secondsPastEpoch",
+                pvd::static_shared_vector_cast<const void>(self->sec));
+        multiArray::set_column(prec, "nanoseconds",
+                pvd::static_shared_vector_cast<const void>(self->ns));
+
+        if(!self->receiver->valid)
             (void)recGblSetSevr(prec, COMM_ALARM, INVALID_ALARM);
 
         return 2; // disable convert
@@ -471,10 +593,13 @@ struct dset6 {
 dset6<aiRecord> devSpamCounter = {{6, 0,0, &Receiver::init_record, &Receiver::get_io_intr_info}, &Receiver::read_counter};
 dset6<aoRecord> devSpamControlPeriod = {{6, 0,0, &Controller::init_record, 0}, &Controller::write_period};
 
+dset6<columnarinRecord> devSpamCOLICounter = {{6, 0,0, &Receiver::init_record_coli, &Receiver::get_io_intr_info_tbl}, &Receiver::read_counter_tbl};
+
 } // namespace
 
 extern "C" {
 epicsExportRegistrar(dspamReg);
 epicsExportAddress(dset, devSpamCounter);
 epicsExportAddress(dset, devSpamControlPeriod);
+epicsExportAddress(dset, devSpamCOLICounter);
 }

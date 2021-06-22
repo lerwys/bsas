@@ -20,8 +20,11 @@ DBD += dspam.dbd
 
 # dspam.dbd will be made up from these files:
 dspam_DBD += base.dbd
+dspam_DBD += PVAServerRegister.dbd
+dspam_DBD += qsrv.dbd
 dspam_DBD += dspamSupport.dbd
 dspam_LIBS += dspamSupport
+dspam_LIBS += qsrv
 
 # dspam_registerRecordDeviceDriver.cpp derives from dspam.dbd
 dspam_SRCS += dspam_registerRecordDeviceDriver.cpp
@@ -34,6 +37,7 @@ dspam_SRCS_vxWorks += -nil-
 #dspam_OBJS_vxWorks += $(EPICS_BASE_BIN)/vxComLibrary
 
 # Finally link to the EPICS Base libraries
+dspam_LIBS += $(EPICS_BASE_PVA_CORE_LIBS)
 dspam_LIBS += $(EPICS_BASE_IOC_LIBS)
 
 #===========================
