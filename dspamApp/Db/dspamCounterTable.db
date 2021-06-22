@@ -1,5 +1,6 @@
 record(columnarin, "$(N)") {
     field(DTYP, "Spam COLI Counter")
+    field(LAY , "Table")
     field(INP , "@$(NAME)")
     field(SCAN, "I/O Intr")
     field(TSE , "-2")
