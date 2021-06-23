@@ -46,6 +46,7 @@ namespace pvd = epics::pvData;
 
 // arbitrary number of columns for columnarinRecord devsup
 static const size_t MAX_COLS = 16;
+static const size_t MAX_ROWS = 1000;
 
 typedef epicsGuard<epicsMutex> Guard;
 typedef epicsGuardRelease<epicsMutex> UnGuard;
@@ -333,23 +334,14 @@ long Receiver::get_io_intr_info_tbl(int detach, struct dbCommon *prec, IOSCANPVT
 
 long Receiver::read_counter_tbl(columnarinRecord* prec)
 {
-    const size_t limit = 1000;
     TRY(CounterTable) {
-        pvd::shared_vector<pvd::uint32> sec, ns;
+        pvd::shared_vector<pvd::uint32> sec(MAX_ROWS, self->receiver->stamp.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH);
+        pvd::shared_vector<pvd::uint32> ns;
 
-        sec.reserve(1+self->sec.size());
-        ns.reserve(1+self->ns.size());
+        ns.reserve(MAX_ROWS);
 
-        // add actual stamp
-        sec.push_back(self->receiver->stamp.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH);
-        ns.push_back(self->receiver->stamp.nsec);
-
-        // push older other stamps back to vector
-        for(size_t i = 0; i < self->sec.size() && i < limit; i++) {
-            sec.push_back(self->sec[i]);
-        }
-        for(size_t i = 0; i < self->ns.size() && i < limit; i++) {
-            ns.push_back(self->ns[i]);
+        for(size_t i = 0; i < MAX_ROWS; i++) {
+            ns.push_back(self->receiver->stamp.nsec + i);
         }
 
         self->sec = pvd::freeze(sec);
@@ -360,11 +352,10 @@ long Receiver::read_counter_tbl(columnarinRecord* prec)
             Counter& count = *it;
 
             pvd::shared_vector<pvd::uint32> temp;
-            temp.reserve(1+count.counter.size());
-            temp.push_back(self->receiver->counter);
+            temp.reserve(MAX_ROWS);
 
-            for(size_t i = 0; i < count.counter.size() && i < limit; i++) {
-                temp.push_back(count.counter[i]);
+            for(size_t i = 0; i < MAX_ROWS; i++) {
+                temp.push_back(self->receiver->counter*MAX_ROWS+i);
             }
 
             count.counter = pvd::freeze(temp);
