@@ -369,6 +369,8 @@ long Receiver::read_counter_tbl(columnarinRecord* prec)
         multiArray::set_column(prec, "nanoseconds",
                 pvd::static_shared_vector_cast<const void>(self->ns));
 
+        prec->time = self->receiver->stamp;
+
         if(!self->receiver->valid)
             (void)recGblSetSevr(prec, COMM_ALARM, INVALID_ALARM);
 
