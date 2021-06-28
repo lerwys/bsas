@@ -55,8 +55,8 @@ void aggHook(initHookState state)
 
     try {
         for(auto& it : controllers) {
-            it.second = std::make_unique<Controller>(it.first, *provider,
-                    *cliprovider);
+            it.second = std::unique_ptr<Controller>(new Controller(it.first, *provider,
+                    *cliprovider));
         }
     }
     catch(std::exception& e) {
