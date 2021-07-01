@@ -4,6 +4,7 @@
 #include <pv/standardField.h>
 
 #include "controller.h"
+#include "collector.h"
 
 namespace pvd = epics::pvData;
 
@@ -93,6 +94,10 @@ void Controller::run()
 {
     Guard G(mutex);
 
+    // set put handler for pv_signals as shared_from_this() does not
+    // work on constructor
+    pv_signals->setHandler(std::make_shared<SignalsHandler>(shared_from_this()));
+
     bool expire = false;
 
     while(running) {
@@ -100,13 +105,23 @@ void Controller::run()
         signals_changed = false;
 
         if(changing) {
+            try {
+                // handle change of PV list
+                signals.make_unique();
+
+                UnGuard U(G);
+
+                collector.reset(new Collector(cliprovider, signals, epicsThreadPriorityMedium+5));
+                printf("Controller: reset collector, %s\n", prefix.c_str());
+            } catch(std::exception& e){
+                fprintf(stderr, "Controller: error: '%s'\n", e.what());
+            }
         }
 
         if(expire || changing) {
             // update status table
             {
                 UnGuard U(G);
-                printf("Test update!\n");
             }
         }
 

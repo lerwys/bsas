@@ -17,6 +17,8 @@
 
 #include "iocshelper.h"
 #include "controller.h"
+#include "collector.h"
+#include "collect_pva.h"
 
 #include <epicsExport.h>
 
@@ -26,7 +28,7 @@ namespace pva = epics::pvAccess;
 namespace {
 
 // static after iocInit()
-std::map<std::string, std::unique_ptr<Controller> > controllers;
+std::map<std::string, std::shared_ptr<Controller> > controllers;
 
 // server/client providers
 pvas::StaticProvider::shared_pointer provider;
@@ -55,7 +57,7 @@ void aggHook(initHookState state)
 
     try {
         for(auto& it : controllers) {
-            it.second = std::unique_ptr<Controller>(new Controller(it.first, *provider,
+            it.second = std::shared_ptr<Controller>(new Controller(it.first, *provider,
                     *cliprovider));
         }
     }
@@ -81,6 +83,9 @@ void aggTableAdd(const char *prefix)
 void aggRegistrar()
 {
     epics::registerRefCounter("Controller", &Controller::num_instances);
+    epics::registerRefCounter("Collector", &Collector::num_instances);
+    epics::registerRefCounter("WorkQueuePVA", &WorkQueuePVA::num_instances);
+    epics::registerRefCounter("SubscriptionPVA", &SubscriptionPVA::num_instances);
 
     // register our (empty) provider before the PVA server is started
     provider.reset(new pvas::StaticProvider("agg"));

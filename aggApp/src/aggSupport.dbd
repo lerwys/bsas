@@ -1,1 +1,7 @@
 registrar(aggRegistrar)
+
+variable(collectorDebug,int)
+
+variable(collectorPvaDebug,int)
+variable(collectorPvaScalarMaxRate,double)
+variable(collectorPvaArrayMaxRate,double)

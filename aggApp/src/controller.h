@@ -18,7 +18,11 @@ typedef epicsGuardRelease<epicsMutex> UnGuard;
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
-class Controller : public epicsThreadRunable {
+class Collector;
+
+class Controller : public epicsThreadRunable,
+                   public std::enable_shared_from_this<Controller>
+{
 public:
     static size_t num_instances;
 
@@ -34,6 +38,8 @@ private:
     pvas::SharedPV::shared_pointer pv_signals;
     pvas::SharedPV::shared_pointer pv_status;
     pvd::PVStructurePtr root_status;
+
+    std::unique_ptr<Collector> collector;
 
     pvd::shared_vector<const std::string> signals;
 
@@ -52,7 +58,7 @@ private:
     // for handling pv_signals put
     class SignalsHandler : public pvas::SharedPV::Handler {
     public:
-        SignalsHandler(const std::tr1::shared_ptr<Controller>& controller) :controller(controller) {}
+        SignalsHandler(const std::shared_ptr<Controller>& controller) :controller(controller) {}
 
         // overrides SharedPV::Handler
         virtual void onPut(const pvas::SharedPV::shared_pointer& pv, pvas::Operation& op) override;
