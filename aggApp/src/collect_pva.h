@@ -94,8 +94,6 @@ private:
 
     epicsMutex mutex;
 
-    pvd::BitSet valid; // only access for process()
-
     epicsTimeStamp last_event;
 
     std::deque<pvd::PVStructurePtr> values;

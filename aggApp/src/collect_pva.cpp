@@ -245,7 +245,6 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                 break;
             case pvac::MonitorEvent::Disconnect:
                 errlogPrintf("SubscriptionPVA: %s <Disconnect>\n", mon.name().c_str());
-                valid.clear();
                 break;
             case pvac::MonitorEvent::Data:
                 {
@@ -253,7 +252,6 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                     // tune this value, maybe
                     for(n=0; n<2 && mon.poll(); n++) {
                         std::ostringstream val;
-                        valid |= mon.changed;
 
                         try {
                             // mon.root only != NULL after poll()
