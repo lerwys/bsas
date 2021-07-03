@@ -238,13 +238,16 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
     try {
         switch(evt.event) {
             case pvac::MonitorEvent::Fail:
-                errlogPrintf("SubscriptionPVA: %s Error %s\n", mon.name().c_str(), evt.message.c_str());
+                if(collectorPvaDebug>0)
+                    errlogPrintf("SubscriptionPVA: %s Error %s\n", mon.name().c_str(), evt.message.c_str());
                 break;
             case pvac::MonitorEvent::Cancel:
-                errlogPrintf("SubscriptionPVA: %s <Cancel>\n", mon.name().c_str());
+                if(collectorPvaDebug>0)
+                    errlogPrintf("SubscriptionPVA: %s <Cancel>\n", mon.name().c_str());
                 break;
             case pvac::MonitorEvent::Disconnect:
-                errlogPrintf("SubscriptionPVA: %s <Disconnect>\n", mon.name().c_str());
+                if(collectorPvaDebug>0)
+                    errlogPrintf("SubscriptionPVA: %s <Disconnect>\n", mon.name().c_str());
                 break;
             case pvac::MonitorEvent::Data:
                 {
