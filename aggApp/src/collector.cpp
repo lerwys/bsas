@@ -106,9 +106,8 @@ void Collector::run()
 
                 try {
                     // detect invalid PV
-                    auto val_length = val->getSubFieldT<pvd::PVUIntArray>("value.secondsPastEpoch")->
-                        getLength();
-                    if(!val_length) {
+                    auto sec = val->getSubFieldT<pvd::PVLong>("timeStamp.secondsPastEpoch")->get();
+                    if(sec == 0) {
                         pv.ready = false;
                         continue;
                     }

@@ -7,6 +7,7 @@
 
 #include <pv/standardField.h>
 #include <pv/createRequest.h>
+#include <pv/sharedVector.h>
 
 #include "collect_pva.h"
 #include "collector.h"
@@ -14,33 +15,10 @@
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
-static const size_t MAX_ROWS = 1000;
-
 namespace {
 
-pvd::StructureConstPtr type_placeholder_table(pvd::getFieldCreate()->createFieldBuilder()
+pvd::StructureConstPtr type_table(pvd::getFieldCreate()->createFieldBuilder()
                                    ->setId("epics:nt/NTTable:1.0")
-                                   ->addArray("labels", pvd::pvString)
-                                   ->addNestedStructure("value")
-                                       ->addArray("secondsPastEpoch",  pvd::pvUInt)
-                                       ->addArray("nanoseconds",  pvd::pvUInt)
-                                       ->addArray("count0",  pvd::pvUInt)
-                                       ->addArray("count1",  pvd::pvUInt)
-                                       ->addArray("count2",  pvd::pvUInt)
-                                       ->addArray("count3",  pvd::pvUInt)
-                                       ->addArray("count4",  pvd::pvUInt)
-                                       ->addArray("count5",  pvd::pvUInt)
-                                       ->addArray("count6",  pvd::pvUInt)
-                                       ->addArray("count7",  pvd::pvUInt)
-                                       ->addArray("count8",  pvd::pvUInt)
-                                       ->addArray("count9",  pvd::pvUInt)
-                                       ->addArray("count10", pvd::pvUInt)
-                                       ->addArray("count11", pvd::pvUInt)
-                                       ->addArray("count12", pvd::pvUInt)
-                                       ->addArray("count13", pvd::pvUInt)
-                                       ->addArray("count14", pvd::pvUInt)
-                                       ->addArray("count15", pvd::pvUInt)
-                                   ->endNested()
                                    ->add("alarm", pvd::getStandardField()->alarm())
                                    ->add("timeStamp", pvd::getStandardField()->timeStamp())
                                    ->createStructure());
@@ -133,6 +111,8 @@ SubscriptionPVA::SubscriptionPVA(pvac::ClientProvider& provider,
     ,monwork(monwork)
     ,collector(collector)
     ,idx(idx)
+    ,retype(true)
+    ,ptr(nullptr)
     ,connected(false)
     ,nDisconnects(0u)
     ,lDisconnects(0u)
@@ -194,7 +174,7 @@ void SubscriptionPVA::connectEvent(const pvac::ConnectEvent& evt)
             limit = std::max(size_t(4u), size_t((collectorPvaArrayMaxRate)));
         }
         else {
-            auto val = createDefaultPV();
+            auto val = pvd::getPVDataCreate()->createPVStructure(type_table);
 
             bool notify;
             {
@@ -252,20 +232,25 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
             case pvac::MonitorEvent::Data:
                 {
                     unsigned n;
-                    // tune this value, maybe
                     for(n=0; n<2 && mon.poll(); n++) {
-                        std::ostringstream val;
-
                         try {
-                            // mon.root only != NULL after poll()
-                            auto& pv_type = mon.root->getStructure();
-                            // get the size of just one array and say it's the same for all
-                            auto pv_sec_size = mon.root->getSubFieldT<pvd::PVUIntArray>("value.secondsPastEpoch")->
-                                getLength();
+                            // detect type changes
+                            retype = false;
+                            if(ptr != mon.root.get()) {
+                                retype = true;
+                                ptr = mon.root.get();
+
+                                if(collectorPvaDebug>1) {
+                                    errlogPrintf("SubscriptionPVA: %s retype in progress\n",
+                                            pvname.c_str());
+                                }
+                            }
 
                             if(collectorPvaDebug>1) {
-                                errlogPrintf("SubscriptionPVA: %s event ID: %s count: %ld\n", pvname.c_str(),
-                                        pv_type->getID().empty()? "(empty)":pv_type->getID().c_str(), pv_sec_size);
+                                std::ostringstream val;
+                                auto& pv_type = mon.root->getStructure();
+                                errlogPrintf("SubscriptionPVA: %s, ID: %s\n", pvname.c_str(),
+                                        pv_type->getID().empty()? "(empty)":pv_type->getID().c_str());
 
                                 pvd::PVStructure::Formatter fmt(mon.root->stream()
                                         .format(pvd::PVStructure::Formatter::NT));
@@ -273,32 +258,45 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                                 errlogPrintf("SubscriptionPVA: %s channel value:\n%s\n", pvname.c_str(),val.str().c_str());
                             }
 
-                            // copy temp with received values
-                            auto temp = createDefaultPV();
-                            auto temp_val = temp->getSubFieldT<pvd::PVStructure>("value");
-                            auto val = mon.root->getSubFieldT<pvd::PVStructure>("value");
-                            for(auto& it : val->getPVFields()) {
-                                auto val_field_name = it->getFieldName();
-                                auto val_field = val->getSubFieldT<pvd::PVUIntArray>(val_field_name);
-                                auto val_field_length = val_field->getLength();
-                                // FIXME: how to get the ScalarType from the PVUIntArray field?
-                                auto const val_field_stype = pvd::pvUInt;
+                            if(retype) {
+                                auto builder = pvd::getFieldCreate()->createFieldBuilder()
+                                                                    ->setId("epics:nt/NTTable:1.0")
+                                                                    ->addArray("labels", pvd::pvString)
+                                                                    ->addNestedStructure("value");
 
-                                auto buf = pvd::ScalarTypeFunc::allocArray<val_field_stype>(val_field_length);
-                                std::copy(val_field->view().begin(), val_field->view().end(), buf.begin());
+                                auto val = mon.root->getSubFieldT<pvd::PVStructure>("value");
+                                for(auto& it : val->getPVFields()) {
+                                    auto field = it->getField();
+                                    auto fname = it->getFieldName();
 
-                                auto temp_field = temp_val->getSubFieldT<pvd::PVUIntArray>(val_field_name);
-                                temp_field->putFrom(pvd::freeze(buf));
+                                    builder = builder->add(fname, field);
+                                }
+
+                                type = builder->endNested()
+                                                   ->add("alarm", pvd::getStandardField()->alarm())
+                                                   ->add("timeStamp", pvd::getStandardField()->timeStamp())
+                                                   ->createStructure();
                             }
 
-                            // FIXME: how to copy timestamp/alarm automatically?
+                            // copy values
+                            auto root = pvd::getPVDataCreate()->createPVStructure(type);
+
+                            auto flabels = root->getSubFieldT<pvd::PVStringArray>("labels");
+                            flabels->replace(mon.root->getSubFieldT<pvd::PVStringArray>("labels")->view());
+
+                            root->getSubFieldT<pvd::PVStructure>("value")->copy(
+                                    *mon.root->getSubFieldT<pvd::PVStructure>("value"));
+                            root->getSubFieldT<pvd::PVStructure>("alarm")->copy(
+                                    *mon.root->getSubFieldT<pvd::PVStructure>("alarm"));
+                            root->getSubFieldT<pvd::PVStructure>("timeStamp")->copy(
+                                    *mon.root->getSubFieldT<pvd::PVStructure>("timeStamp"));
 
                             bool notify;
                             {
                                 Guard G(mutex);
                                 notify = values.empty();
 
-                                _push(temp);
+                                _push(root);
                             }
 
                             if(notify) {
@@ -306,7 +304,7 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                             }
                         }
                         catch(std::exception& e) {
-                            errlogPrintf("SubscriptionPVA: could not get value from channel %s: %s\n",
+                            errlogPrintf("SubscriptionPVA: could not copy value from channel %s: %s\n",
                                     mon.name().c_str(), e.what());
                         }
                     }
@@ -344,7 +342,7 @@ void SubscriptionPVA::clear(size_t remain)
 
 pvd::PVStructurePtr SubscriptionPVA::pop()
 {
-    auto ret = pvd::getPVDataCreate()->createPVStructure(type_placeholder_table);
+    auto ret = pvd::getPVDataCreate()->createPVStructure(type_table);
     {
         Guard G(mutex);
         if(!values.empty()) {
@@ -353,56 +351,6 @@ pvd::PVStructurePtr SubscriptionPVA::pop()
         }
     }
     return ret;
-}
-
-
-pvd::PVStructurePtr SubscriptionPVA::createDefaultPV()
-{
-    // Add labels to placeholder strucutre columns
-    auto val = pvd::getPVDataCreate()->createPVStructure(type_placeholder_table);
-    {
-        pvd::shared_vector<std::string> labels;
-        labels.push_back("sec");
-        labels.push_back("ns");
-        labels.push_back("count0");
-        labels.push_back("count1");
-        labels.push_back("count2");
-        labels.push_back("count3");
-        labels.push_back("count4");
-        labels.push_back("count5");
-        labels.push_back("count6");
-        labels.push_back("count7");
-        labels.push_back("count8");
-        labels.push_back("count9");
-        labels.push_back("count10");
-        labels.push_back("count11");
-        labels.push_back("count12");
-        labels.push_back("count13");
-        labels.push_back("count14");
-        labels.push_back("count15");
-
-        auto flabel = val->getSubFieldT<pvd::PVStringArray>("labels");
-        flabel->replace(pvd::freeze(labels));
-    }
-
-    epicsTimeStamp ts;
-    epicsTimeGetCurrent(&ts);
-
-    // add timestamp to placeholder strucutre
-    {
-        pvd::shared_vector<pvd::uint32> ns;
-        pvd::shared_vector<pvd::uint32> sec;
-
-        ns.push_back(ts.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH);
-        sec.push_back(ts.nsec);
-
-        auto fsec = val->getSubFieldT<pvd::PVUIntArray>("value.secondsPastEpoch");
-        fsec->replace(pvd::freeze(sec));
-        auto fns = val->getSubFieldT<pvd::PVUIntArray>("value.nanoseconds");
-        fns->replace(pvd::freeze(ns));
-    }
-
-    return val;
 }
 
 // assume locked

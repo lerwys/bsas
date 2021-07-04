@@ -14,6 +14,7 @@
 #include <pv/reftrack.h>
 #include <pv/thread.h>
 #include <pva/client.h>
+#include <pv/pvSubArrayCopy.h>
 
 #include "subscribable.h"
 
@@ -91,14 +92,17 @@ private:
     pvac::Monitor mon;
     Collector& collector;
     size_t idx;
+    bool retype;
 
     epicsMutex mutex;
 
     epicsTimeStamp last_event;
 
-    std::deque<pvd::PVStructurePtr> values;
+    // for detecting root type changes
+    pvd::PVStructure const* ptr;
 
-    pvd::PVStructurePtr createDefaultPV();
+    pvd::StructureConstPtr type;
+    std::deque<pvd::PVStructurePtr> values;
 
     void _push(pvd::PVStructurePtr v);
 
