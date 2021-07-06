@@ -11,12 +11,14 @@ namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
 int collectorDebug;
+int collectorNumWorkQueue;
 
 size_t Collector::num_instances;
 
 Collector::Collector(pvac::ClientProvider& cliprovider,
                        const pvd::shared_vector<const std::string>& names,
-                       unsigned int prio)
+                       unsigned int prio,
+                       size_t num_work_queue)
     :cliprovider(cliprovider)
     ,waiting(false)
     ,running(true)
@@ -28,10 +30,12 @@ Collector::Collector(pvac::ClientProvider& cliprovider,
 
     pvs.resize(names.size());
 
-    work_queue.reset(new WorkQueuePVA(epicsThreadPriorityMedium+1));
+    for(size_t i = 0; i < num_work_queue; i++) {
+        work_queue.push_back(std::unique_ptr<WorkQueuePVA>(new WorkQueuePVA(epicsThreadPriorityMedium+1)));
+    }
 
-    for(size_t i=0, N=names.size(); i<N; i++) {
-        pvs[i].sub = std::make_shared<SubscriptionPVA>(cliprovider, *work_queue, names[i],
+    for(size_t i = 0, n_queue = work_queue.size(); i < names.size(); i++) {
+        pvs[i].sub = std::make_shared<SubscriptionPVA>(cliprovider, *work_queue[i % n_queue], names[i],
                     pvd::createRequest(std::string("field(value)")), *this, i);
     }
 
@@ -57,7 +61,7 @@ void Collector::close()
     wakeup.signal();
     processor.exitWait();
 
-    work_queue.reset();
+    work_queue.clear();
 }
 
 void Collector::notEmpty(Subscribable *sub)
@@ -145,4 +149,5 @@ void Collector::run()
 
 extern "C" {
 epicsExportAddress(int, collectorDebug);
+epicsExportAddress(int, collectorNumWorkQueue);
 }

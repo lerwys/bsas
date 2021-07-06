@@ -6,6 +6,8 @@
 dbLoadDatabase("${TOP}/dbd/agg.dbd",0,0)
 agg_registerRecordDeviceDriver(pdbbase)
 
+var(controllerNumWorkQueue, 4)
+
 var(collectorDebug, 3)
 var(collectorPvaDebug, 3)
 

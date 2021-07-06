@@ -1,5 +1,7 @@
 registrar(aggRegistrar)
 
+variable(controllerNumWorkQueue,int)
+
 variable(collectorDebug,int)
 
 variable(collectorPvaDebug,int)

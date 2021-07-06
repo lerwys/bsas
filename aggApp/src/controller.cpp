@@ -6,7 +6,11 @@
 #include "controller.h"
 #include "collector.h"
 
+#include <epicsExport.h>
+
 namespace pvd = epics::pvData;
+
+int controllerNumWorkQueue;
 
 namespace {
 
@@ -152,4 +156,8 @@ void Controller::SignalsHandler::onPut(const pvas::SharedPV::shared_pointer& pv,
 
     pv->post(op.value(), op.changed());
     op.complete();
+}
+
+extern "C" {
+epicsExportAddress(int, controllerNumWorkQueue);
 }

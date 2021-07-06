@@ -29,7 +29,8 @@ public:
 
     explicit Collector(pvac::ClientProvider& cliprovider,
                        const pvd::shared_vector<const std::string>& names,
-                       unsigned int prio);
+                       unsigned int prio,
+                       size_t num_work_queue = 4);
     ~Collector();
 
     void close();
@@ -48,7 +49,7 @@ private:
     epicsEvent wakeup;
 
     pvac::ClientProvider& cliprovider;
-    std::unique_ptr<WorkQueuePVA> work_queue;
+    std::vector<std::unique_ptr<WorkQueuePVA>> work_queue;
     bool waiting;
     bool running;
 
