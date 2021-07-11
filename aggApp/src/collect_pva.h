@@ -92,14 +92,10 @@ private:
     pvac::Monitor mon;
     Collector& collector;
     size_t idx;
-    bool retype;
 
     epicsMutex mutex;
 
     epicsTimeStamp last_event;
-
-    // for detecting root type changes
-    pvd::PVStructure const* ptr;
 
     pvd::StructureConstPtr type;
     std::deque<pvd::PVStructurePtr> values;

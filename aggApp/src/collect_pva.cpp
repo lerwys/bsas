@@ -111,8 +111,6 @@ SubscriptionPVA::SubscriptionPVA(pvac::ClientProvider& provider,
     ,monwork(monwork)
     ,collector(collector)
     ,idx(idx)
-    ,retype(true)
-    ,ptr(nullptr)
     ,connected(false)
     ,nDisconnects(0u)
     ,lDisconnects(0u)
@@ -239,18 +237,6 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                     unsigned n;
                     for(n=0; n<2 && mon.poll(); n++) {
                         try {
-                            // detect type changes
-                            retype = false;
-                            if(ptr != mon.root.get()) {
-                                retype = true;
-                                ptr = mon.root.get();
-
-                                if(collectorPvaDebug>1) {
-                                    errlogPrintf("SubscriptionPVA: %s retype in progress\n",
-                                            pvname.c_str());
-                                }
-                            }
-
                             if(collectorPvaDebug>1) {
                                 std::ostringstream val;
                                 auto& pv_type = mon.root->getStructure();
@@ -263,38 +249,9 @@ void SubscriptionPVA::process(const pvac::MonitorEvent& evt)
                                 errlogPrintf("SubscriptionPVA: %s channel value:\n%s\n", pvname.c_str(),val.str().c_str());
                             }
 
-                            if(retype) {
-                                auto builder = pvd::getFieldCreate()->createFieldBuilder()
-                                                                    ->setId("epics:nt/NTTable:1.0")
-                                                                    ->addArray("labels", pvd::pvString)
-                                                                    ->addNestedStructure("value");
-
-                                auto val = mon.root->getSubFieldT<pvd::PVStructure>("value");
-                                for(auto& it : val->getPVFields()) {
-                                    auto field = it->getField();
-                                    auto fname = it->getFieldName();
-
-                                    builder = builder->add(fname, field);
-                                }
-
-                                type = builder->endNested()
-                                                   ->add("alarm", pvd::getStandardField()->alarm())
-                                                   ->add("timeStamp", pvd::getStandardField()->timeStamp())
-                                                   ->createStructure();
-                            }
-
-                            // copy values
-                            auto root = pvd::getPVDataCreate()->createPVStructure(type);
-
-                            auto flabels = root->getSubFieldT<pvd::PVStringArray>("labels");
-                            flabels->replace(mon.root->getSubFieldT<pvd::PVStringArray>("labels")->view());
-
-                            root->getSubFieldT<pvd::PVStructure>("value")->copy(
-                                    *mon.root->getSubFieldT<pvd::PVStructure>("value"));
-                            root->getSubFieldT<pvd::PVStructure>("alarm")->copy(
-                                    *mon.root->getSubFieldT<pvd::PVStructure>("alarm"));
-                            root->getSubFieldT<pvd::PVStructure>("timeStamp")->copy(
-                                    *mon.root->getSubFieldT<pvd::PVStructure>("timeStamp"));
+                            // copy the whole PVStructure
+                            auto root = pvd::getPVDataCreate()->createPVStructure(mon.root->getStructure());
+                            root->copy(*mon.root);
 
                             bool notify;
                             {
