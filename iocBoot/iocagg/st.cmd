@@ -8,8 +8,8 @@ agg_registerRecordDeviceDriver(pdbbase)
 
 var(controllerNumWorkQueue, 4)
 
-var(collectorDebug, 3)
-var(collectorPvaDebug, 3)
+var(collectorDebug, 1)
+var(collectorPvaDebug, 1)
 
 aggTableAdd("RX:")
 
