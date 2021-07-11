@@ -92,6 +92,9 @@ Controller::~Controller()
     }
     wakeup.signal();
     handler.exitWait();
+
+    aggregator.reset();
+    collector.reset(); // joins collector worker and cancels PVA subscriptions
 }
 
 void Controller::run()
@@ -115,8 +118,15 @@ void Controller::run()
 
                 UnGuard U(G);
 
+                // we need to reset aggregator first because we hold a reference
+                // to collector
+                aggregator.reset();
+                collector.reset();
+
                 collector.reset(new Collector(cliprovider, signals, epicsThreadPriorityMedium+5));
                 printf("Controller: reset collector, %s\n", prefix.c_str());
+                aggregator.reset(new AggregatorPVA(prefix + "TBL", provider, *collector));
+                printf("Controller: reset aggregator, %s\n", prefix.c_str());
             } catch(std::exception& e){
                 fprintf(stderr, "Controller: error: '%s'\n", e.what());
             }

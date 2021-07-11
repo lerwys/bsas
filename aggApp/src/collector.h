@@ -3,6 +3,8 @@
 
 #include <string>
 #include <deque>
+#include <map>
+#include <set>
 
 #include <epicsTime.h>
 #include <epicsMutex.h>
@@ -23,6 +25,13 @@ namespace pva = epics::pvAccess;
 typedef epicsGuard<epicsMutex> Guard;
 typedef epicsGuardRelease<epicsMutex> UnGuard;
 
+struct Aggregator {
+    virtual ~Aggregator() {}
+    virtual void reset(const std::vector<std::string>& n) = 0;
+    virtual void aggregate(const std::vector<
+            std::pair<epicsUInt64, std::vector<pvd::PVStructurePtr>>>& events) = 0;
+};
+
 class Collector : public epicsThreadRunable {
 public:
     static size_t num_instances;
@@ -36,6 +45,9 @@ public:
     void close();
     void notEmpty(Subscribable *sub);
 
+    void addAggregator(Aggregator* agg);
+    void removeAggregator(Aggregator* agg);
+
 private:
     struct PV {
         std::shared_ptr<SubscriptionPVA> sub;
@@ -44,6 +56,10 @@ private:
         PV() :ready(false), connected(false) {}
     };
     std::vector<PV> pvs;
+
+    std::set<Aggregator *> aggregators;
+    std::set<Aggregator *> aggregators_shadow;
+    bool aggregators_changed;
 
     epicsMutex mutex;
     epicsEvent wakeup;
@@ -55,9 +71,14 @@ private:
 
     epics::pvData::Thread processor;
 
+    // events happened on a certain timestamp, collected for all
+    // registered PVs
+    std::map<epicsUInt64, std::vector<pvd::PVStructurePtr>> events;
+    // completed valid events: expected format, aligned, valid timestamp, all tables present
+    std::vector<std::pair<epicsUInt64, std::vector<pvd::PVStructurePtr>>> completed_events;
     epicsTimeStamp now;
-    epicsUInt64 now_key,
-                oldest_key; // oldest key sent to Receviers
+    epicsUInt64 now_key;
+    epicsUInt64 oldest_key; // oldest key sent to Aggregators
 
     // override Worker
     virtual void run() override final;

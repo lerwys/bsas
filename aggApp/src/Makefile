@@ -30,6 +30,7 @@ agg_SRCS += hooks.cpp
 agg_SRCS += controller.cpp
 agg_SRCS += collector.cpp
 agg_SRCS += collect_pva.cpp
+agg_SRCS += aggregator_pva.cpp
 
 # Build the main IOC entry point on workstation OSs.
 agg_SRCS_DEFAULT += aggMain.cpp

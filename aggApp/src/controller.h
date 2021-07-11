@@ -12,6 +12,8 @@
 #include <epicsMutex.h>
 #include <epicsGuard.h>
 
+#include "aggregator_pva.h"
+
 typedef epicsGuard<epicsMutex> Guard;
 typedef epicsGuardRelease<epicsMutex> UnGuard;
 
@@ -40,6 +42,7 @@ private:
     pvd::PVStructurePtr root_status;
 
     std::unique_ptr<Collector> collector;
+    std::unique_ptr<AggregatorPVA> aggregator;
 
     pvd::shared_vector<const std::string> signals;
 
