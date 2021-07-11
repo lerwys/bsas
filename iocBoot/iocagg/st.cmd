@@ -11,6 +11,8 @@ var(controllerNumWorkQueue, 4)
 var(collectorDebug, 1)
 var(collectorPvaDebug, 1)
 
+var(aggregatorPvaDebug, 1)
+
 aggTableAdd("RX:")
 
 iocInit()
