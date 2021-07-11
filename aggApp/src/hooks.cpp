@@ -19,6 +19,7 @@
 #include "controller.h"
 #include "collector.h"
 #include "collect_pva.h"
+#include "aggregator_pva.h"
 
 #include <epicsExport.h>
 
@@ -86,6 +87,8 @@ void aggRegistrar()
     epics::registerRefCounter("Collector", &Collector::num_instances);
     epics::registerRefCounter("WorkQueuePVA", &WorkQueuePVA::num_instances);
     epics::registerRefCounter("SubscriptionPVA", &SubscriptionPVA::num_instances);
+    epics::registerRefCounter("AggregatorPVA", &AggregatorPVA::num_instances);
+    epics::registerRefCounter("TColumn", &TColumn::num_instances);
 
     // register our (empty) provider before the PVA server is started
     provider.reset(new pvas::StaticProvider("agg"));
