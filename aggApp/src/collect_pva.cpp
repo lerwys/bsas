@@ -147,7 +147,12 @@ void SubscriptionPVA::close()
 {
     {
         Guard G(mutex);
+        // immediate cancelation
+        mon.cancel();
+        // remove connect callback
         chan.removeConnectListener(this);
+        // disconnect channel
+        provider.disconnect(pvname);
     }
     if(collectorPvaDebug>0) {
         errlogPrintf("SubscriptionPVA: clear Channel to '%s'\n", pvname.c_str());
